@@ -15,3 +15,7 @@ todos.json
 node_modules/
 .idea/
 .vscode/
+
+# Personal research scripts — keep local, never publish
+vrtulsrcBarrier_ExpLosssobolev.py
+vrtulsrc*.py
