@@ -6,6 +6,29 @@ Point Codex Cartographer at a **file or a folder**. It walks the tree, parses ev
 
 ---
 
+## Live demo (CV / portfolio link)
+
+A hosted web app lets visitors **click a link → upload a code zip (+ optional paper PDF) → open the interactive atlas**.
+
+```bash
+# run the same app locally
+pip install -e ".[web]"
+uvicorn webapp.server:app --host 0.0.0.0 --port 7860
+# open http://127.0.0.1:7860
+```
+
+**Deploy (public URL for your CV):**
+
+1. Push this repo to GitHub (already at [avanish-singh/codex-cartographer](https://github.com/avanish-singh/codex-cartographer)).
+2. On [Render](https://render.com): **New → Web Service → connect this repo → runtime Docker** (or use Blueprint with `render.yaml`). Free tier sleeps when idle and wakes on the first visit.
+3. Or on [Hugging Face Spaces](https://huggingface.co/new-space): create a **Docker** space, point it at this repo / `Dockerfile` (port `7860`).
+
+After deploy, put the HTTPS URL on your CV, e.g.
+
+`Codex Cartographer — interactive code atlas — https://YOUR-SERVICE.onrender.com`
+
+---
+
 ## 1. Install on any computer (macOS / Linux / Windows)
 
 You need **Python 3.10 or newer** and a normal web browser (Chrome, Edge, Firefox, Safari). Internet is needed **once** when the atlas opens (it loads the 3D library from a CDN).

@@ -19,3 +19,6 @@ node_modules/
 # Personal research scripts — keep local, never publish
 vrtulsrcBarrier_ExpLosssobolev.py
 vrtulsrc*.py
+
+# Local screenshots
+Screenshot*.png

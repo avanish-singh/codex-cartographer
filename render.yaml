@@ -1,0 +1,12 @@
+# One-click style deploy on Render: https://render.com/deploy
+services:
+  - type: web
+    name: codex-cartographer
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: CODEX_MAX_ZIP_MB
+        value: "25"
+      - key: CODEX_MAX_STEPS
+        value: "800"

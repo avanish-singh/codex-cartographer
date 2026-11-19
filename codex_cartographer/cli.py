@@ -10,18 +10,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
 from codex_cartographer import __version__
-from codex_cartographer.explanations import attach_explanations
-from codex_cartographer.ingestion import collect_source_files
-from codex_cartographer.parsers import parse_source_file
-from codex_cartographer.semantic import build_graph
-from codex_cartographer.semantic.paper_semantics import build_paper_semantics
-from codex_cartographer.viz import open_in_browser, render_html
-from codex_cartographer.walkthrough import build_walkthrough, enrich_walkthrough_edges
+from codex_cartographer.pipeline import MappingError, map_project
+from codex_cartographer.viz import open_in_browser
 
 
 def _prompt_path() -> str:
@@ -111,58 +105,6 @@ def run(
         print(f"error: path not found: {root}", file=sys.stderr)
         return 1
 
-    print(f"Ingesting {root} …")
-    sources = collect_source_files(root)
-    if not sources:
-        print(
-            "error: no supported source files found. Run `codex-cartographer --list-languages` "
-            "to see the extensions that are mapped.",
-            file=sys.stderr,
-        )
-        return 1
-    by_lang: dict[str, int] = {}
-    for s in sources:
-        by_lang[s.language] = by_lang.get(s.language, 0) + 1
-    print(f"  found {len(sources)} source file(s): " + ", ".join(f"{k}={v}" for k, v in sorted(by_lang.items())))
-
-    print("Parsing …")
-    results = []
-    failures = 0
-    for src in sources:
-        result = parse_source_file(src)
-        results.append(result)
-        if not result.success:
-            failures += 1
-            err = result.module.parse_error or "unknown"
-            print(f"  ! {src.relative_path}: {err}")
-    print(f"  parsed {len(results) - failures}/{len(results)} cleanly")
-
-    print("Building semantic model …")
-    graph = build_graph(
-        results,
-        source_path=str(root),
-        cluster_threshold=cluster_threshold,
-    )
-    print("Generating explanations …")
-    attach_explanations(graph)
-    print("Building line-by-line walkthrough …")
-    walkthrough = enrich_walkthrough_edges(
-        build_walkthrough(results, graph, max_steps=max_steps), graph
-    )
-    graph.walkthrough = walkthrough
-    if walkthrough.get("condensed"):
-        print(f"  large project: walkthrough condensed to {len(walkthrough['steps'])} key steps (use --max-steps 0 for all)")
-    print("Building research-paper semantic summary …")
-    graph.paper_semantics = build_paper_semantics(results, graph)
-    roles = list((graph.paper_semantics.get("roles") or {}).keys())
-    print(
-        f"  graph: {graph.metadata.get('node_count')} nodes, "
-        f"{graph.metadata.get('edge_count')} edges, "
-        f"{len(walkthrough.get('steps', []))} walkthrough steps"
-    )
-    if roles:
-        print(f"  paper roles detected: {', '.join(roles[:8])}")
-
     out_dir = Path("output")
     out_dir.mkdir(parents=True, exist_ok=True)
     if output:
@@ -170,21 +112,47 @@ def run(
     else:
         out_path = out_dir / "codex_map.html"
 
+    html_target = out_path if out_path.suffix != ".json" else out_path.with_suffix(".html")
+    print(f"Ingesting {root} …")
+    try:
+        summary = map_project(
+            root,
+            output_html=html_target,
+            cluster_threshold=cluster_threshold,
+            max_steps=max_steps,
+        )
+    except MappingError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    langs = ", ".join(f"{k}={v}" for k, v in sorted(summary["languages"].items()))
+    print(f"  found {summary['files']} source file(s): {langs}")
+    if summary.get("condensed"):
+        print(
+            f"  large project: walkthrough condensed to {summary['steps']} key steps "
+            "(use --max-steps 0 for all)"
+        )
+    print(
+        f"  graph: {summary['nodes']} nodes, {summary['edges']} edges, "
+        f"{summary['steps']} walkthrough steps"
+    )
+    if summary.get("roles"):
+        print(f"  paper roles detected: {', '.join(summary['roles'][:8])}")
+
     if json_only:
-        json_path = out_path if out_path.suffix == ".json" else out_path.with_suffix(".graph.json")
-        json_path.parent.mkdir(parents=True, exist_ok=True)
-        json_path.write_text(json.dumps(graph.to_dict(), indent=2), encoding="utf-8")
+        json_path = out_path if out_path.suffix == ".json" else Path(summary["json_path"])
+        if json_path != Path(summary["json_path"]):
+            json_path.write_text(
+                Path(summary["json_path"]).read_text(encoding="utf-8"), encoding="utf-8"
+            )
         print(f"Wrote {json_path.resolve()}")
         return 0
 
-    print("Rendering atlas …")
-    html_path = render_html(graph, out_path)
-    print(f"Wrote {html_path.resolve()}")
-    print(f"Wrote {html_path.with_name(html_path.stem + '.graph.json').resolve()}")
-
+    print(f"Wrote {Path(summary['html_path']).resolve()}")
+    print(f"Wrote {Path(summary['json_path']).resolve()}")
     if not no_open:
         print("Opening browser …")
-        open_in_browser(html_path)
+        open_in_browser(summary["html_path"])
     return 0
 
 
