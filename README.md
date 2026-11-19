@@ -1,6 +1,6 @@
 # Codex Cartographer
 
-**An interactive antique-map atlas of how a codebase actually works — line by line, in 2D and 3D.**
+**An interactive map atlas of how a codebase actually works — line by line, in 2D and 3D.**
 
 Point Codex Cartographer at a **file or a folder**. It walks the tree, parses every supported language, builds one language-agnostic semantic graph, and opens a self-contained HTML atlas in your browser. The left side narrates the code one line at a time; the right side is a live 3D (or 2D) map that labels what that line touches, shades everything unrelated, and lets you click any landmark to see what it is, what it depends on, and who uses it.
 
