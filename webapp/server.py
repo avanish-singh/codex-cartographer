@@ -1,10 +1,8 @@
 """
-Public Codex Cartographer web app — CV-ready demo with upload.
+Codex Cartographer web app — upload a project and open the interactive atlas.
 
 Run locally:
   uvicorn webapp.server:app --host 0.0.0.0 --port 7860
-
-Deploy: see Dockerfile / README deploy section.
 """
 
 from __future__ import annotations
@@ -103,7 +101,7 @@ def _run_demo_job() -> str:
 
 @app.api_route("/api/demo", methods=["GET", "POST"])
 def run_demo() -> RedirectResponse:
-    """Map the built-in sample so CV visitors can try without uploading."""
+    """Map the built-in sample without requiring an upload."""
     return RedirectResponse(url=f"/jobs/{_run_demo_job()}/atlas", status_code=303)
 
 
