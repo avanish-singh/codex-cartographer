@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex Cartographer — Guided Atlas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Courier+Prime:ital@0;1&family=EB+Garamond:ital,wght@0,450;0,600;1,450&display=swap" rel="stylesheet" />
+  <style>__STYLES__</style>
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="brand">
+        <svg class="compass" viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="30" fill="#f3e6c8" stroke="#8B6914" stroke-width="2"/>
+          <circle cx="32" cy="32" r="24" fill="none" stroke="#b08d3e" stroke-width="1" stroke-dasharray="2 2"/>
+          <polygon points="32,8 36,32 32,28 28,32" fill="#8B3A2A"/>
+          <polygon points="32,56 28,32 32,36 36,32" fill="#4a3220"/>
+          <circle cx="32" cy="32" r="3" fill="#b08d3e" stroke="#2b1d12"/>
+          <text x="32" y="14" text-anchor="middle" font-size="6" fill="#4a3220" font-family="serif">N</text>
+        </svg>
+        <div>
+          <h1 id="map-title">Codex Cartographer</h1>
+          <p class="subtitle" id="map-subtitle">Line-by-line guide · live 2D/3D · paper semantics</p>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="layer-group">
+          <span class="label">View</span>
+          <button type="button" class="layer-btn active" data-view="3d">3D</button>
+          <button type="button" class="layer-btn" data-view="2d">2D</button>
+        </div>
+        <div class="layer-group">
+          <span class="label">Map mode</span>
+          <button type="button" class="layer-btn" data-map-mode="all" title="Whole graph visible; active cluster highlighted">All</button>
+          <button type="button" class="layer-btn active" data-map-mode="focus" title="Highlight dependents of the current line; shade the rest">Focus deps</button>
+          <button type="button" class="layer-btn" data-map-mode="grow" title="Reveal landmarks as lines are visited">Grow</button>
+        </div>
+        <div class="layer-group">
+          <span class="label">Labels</span>
+          <button type="button" class="layer-btn active" data-labels="smart" title="Label highlighted nodes, modules and classes">Smart</button>
+          <button type="button" class="layer-btn" data-labels="all">All</button>
+          <button type="button" class="layer-btn" data-labels="off">Off</button>
+        </div>
+        <div class="layer-group">
+          <span class="label">Speed</span>
+          <button type="button" class="tool-btn" data-speed="0.6">Slow</button>
+          <button type="button" class="tool-btn active-speed" data-speed="1">Normal</button>
+          <button type="button" class="tool-btn" data-speed="2">Fast</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="chk-follow" checked /> Camera follows</label>
+        <button type="button" class="tool-btn" id="btn-legend">Legend</button>
+        <button type="button" class="tool-btn" id="btn-paper">Paper summary</button>
+      </div>
+      <div id="file-tabs" class="file-tabs" aria-label="Source files"></div>
+      <div id="breadcrumb">Press Play — the left side explains each line, the right side shows what it touches on the map.</div>
+    </header>
+
+    <div id="main" class="walk-layout">
+      <section id="narrator" aria-label="Code walkthrough">
+        <div class="transport">
+          <button type="button" class="tool-btn" id="btn-prev">◀ Prev</button>
+          <button type="button" class="tool-btn play" id="btn-play">▶ Play</button>
+          <button type="button" class="tool-btn" id="btn-next">Next ▶</button>
+          <button type="button" class="tool-btn" id="btn-restart">Restart</button>
+          <button type="button" class="tool-btn" id="btn-skip-def" title="Jump to next function/class definition">Next def ⏭</button>
+          <span id="step-counter">Step 0 / 0</span>
+        </div>
+        <div class="progress-track"><div id="progress-bar"></div></div>
+
+        <article id="explain-card">
+          <p class="step-kind" id="step-kind">Ready</p>
+          <h2 id="step-title">Begin the expedition</h2>
+          <p id="step-explain" class="detail-explain">
+            Press <strong>Play</strong>. The 3D map labels what the current line touches, shades unrelated code, and the card below explains <em>why</em> those landmarks are connected.
+          </p>
+          <pre class="current-line"><code id="step-code">// waiting…</code></pre>
+          <div id="step-relations" class="relations"></div>
+        </article>
+
+        <div id="code-scroll" class="code-scroll" tabindex="0"></div>
+      </section>
+
+      <section id="stage" aria-label="Live visual">
+        <div id="map-wrap">
+          <div id="map3d" class="map-surface"></div>
+          <svg id="map2d" class="map-surface is-hidden" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div id="hint" class="map-hint">Drag = orbit · Scroll = zoom · Click node = inspect · Right-click node = jump to its line · Click edge = explain route</div>
+          <div id="map-status" class="map-status">Initializing 3D…</div>
+          <div id="callout" class="callout is-hidden">
+            <div class="callout-title" id="callout-title"></div>
+            <div class="callout-body" id="callout-body"></div>
+          </div>
+          <aside id="legend" class="legend is-hidden">
+            <h3>Legend</h3>
+            <div id="legend-tags"></div>
+            <h4>Routes</h4>
+            <div id="legend-edges"></div>
+            <p class="legend-note">Click a tag to highlight every landmark carrying it.</p>
+          </aside>
+        </div>
+        <div id="visual-caption">
+          <strong id="visual-action">Waiting</strong>
+          <span id="visual-detail">The atlas follows the current line.</span>
+        </div>
+        <aside id="inspector" class="inspector is-collapsed">
+          <header>
+            <span id="inspector-title">Landmark inspector</span>
+            <span class="inspector-actions">
+              <button type="button" class="tool-btn small" id="btn-inspect-goto">Go to line</button>
+              <button type="button" class="tool-btn small" id="btn-inspect-focus">Focus deps here</button>
+              <button type="button" class="tool-btn small" id="btn-inspect-toggle">▾</button>
+            </span>
+          </header>
+          <div id="inspector-body">
+            <p class="muted">Click any landmark (node) or route (edge) on the map to see what it is, what it depends on, and who uses it.</p>
+          </div>
+        </aside>
+      </section>
+    </div>
+  </div>
+
+  <div id="paper-modal" class="paper-modal" hidden>
+    <div class="paper-dialog">
+      <header>
+        <h2>Research paper semantics</h2>
+        <button type="button" class="tool-btn" id="btn-paper-close">Close</button>
+      </header>
+      <p class="paper-lead" id="paper-lead"></p>
+      <pre id="paper-body" class="paper-body"></pre>
+    </div>
+  </div>
+
+  <div id="tooltip" role="tooltip"></div>
+  <div id="boot-error" class="boot-error" hidden></div>
+
+  <script>window.GRAPH_DATA = __GRAPH_JSON__;</script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three-spritetext@1.8.2/dist/three-spritetext.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
+  <script>__APP_JS__</script>
+</body>
+</html>

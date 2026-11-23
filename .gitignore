@@ -1,0 +1,24 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+output/
+*.graph.json
+todos.json
+.DS_Store
+node_modules/
+.idea/
+.vscode/
+
+# Personal research scripts — keep local, never publish
+vrtulsrcBarrier_ExpLosssobolev.py
+vrtulsrc*.py
+
+# Local screenshots
+Screenshot*.png
