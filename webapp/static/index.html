@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Codex Cartographer — Interactive Code Atlas</title>
-  <meta name="description" content="Upload a codebase and explore how it works as an interactive 2D/3D atlas with a line-by-line walkthrough." />
+  <meta name="description" content="Upload a codebase and/or a research paper and explore how the code works as an interactive 2D/3D atlas." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Courier+Prime&family=EB+Garamond:ital,wght@0,450;0,600;1,450&display=swap" rel="stylesheet" />
@@ -27,46 +27,50 @@
     </header>
 
     <p class="lede">
-      Upload a project zip (and optionally a research paper). The atlas opens in your browser:
-      a line-by-line walkthrough on the left, a live 2D/3D dependency map on the right.
+      Upload <strong>code</strong>, a <strong>research paper</strong>, or both.
+      Code opens a line-by-line atlas; a paper-only upload opens a readable paper session.
     </p>
 
     <section class="panel" aria-label="Upload and map">
       <h2>Start mapping</h2>
-      <p class="hint">Zip a folder of source files. Optional PDF is attached to the session for reference with the paper-summary view.</p>
+      <p class="hint">Provide at least one of: a project zip, a single source file, or a PDF paper. All three fields are optional individually.</p>
 
       <form id="map-form" action="/api/map" method="post" enctype="multipart/form-data">
         <div class="grid">
           <div class="field-block">
-            <label class="field" for="code_zip">Code archive (.zip) *</label>
-            <input id="code_zip" name="code_zip" type="file" accept=".zip,application/zip" required />
+            <label class="field" for="code_zip">Code archive (.zip)</label>
+            <input id="code_zip" name="code_zip" type="file" accept=".zip,application/zip" />
           </div>
           <div class="field-block">
-            <label class="field" for="paper_pdf">Research paper (.pdf)</label>
-            <input id="paper_pdf" name="paper_pdf" type="file" accept=".pdf,application/pdf" />
+            <label class="field" for="code_file">Or a single source file</label>
+            <input id="code_file" name="code_file" type="file" accept=".py,.js,.mjs,.cjs,.jsx,.ts,.tsx,.c,.h,.cpp,.cc,.cxx,.hpp,.hh,.java,.go,.rs,.m,.jl,.r,.R,.rb,.php,.cs,.kt,.kts,.swift,.zip" />
           </div>
+        </div>
+        <div class="field-block">
+          <label class="field" for="paper_pdf">Research paper (.pdf)</label>
+          <input id="paper_pdf" name="paper_pdf" type="file" accept=".pdf,application/pdf" />
         </div>
         <div class="field-block">
           <label class="field" for="project_name">Project name (optional)</label>
           <input id="project_name" name="project_name" type="text" maxlength="120" placeholder="e.g. Barrier loss training pipeline" />
         </div>
+        <p id="form-error" class="status" style="color:#8b3a2a"></p>
         <div class="actions">
-          <button type="submit" id="btn-map">Map my code</button>
+          <button type="submit" id="btn-map">Start</button>
           <a class="btn secondary" href="/api/demo" id="btn-demo">Try the live demo</a>
         </div>
-        <p class="status" id="status">Building your atlas — this can take up to a minute for larger projects…</p>
+        <p class="status" id="status">Working — this can take up to a minute for larger projects…</p>
       </form>
     </section>
 
     <div class="meta">
       <p><strong>Languages:</strong> Python, JS/TS, C/C++, MATLAB/Octave, Java, Go, Rust, R, Julia, and more.</p>
       <ul class="langs">
-        <li>line-by-line walkthrough</li>
-        <li>2D / 3D map</li>
-        <li>dependency focus</li>
-        <li>research-paper summary</li>
+        <li>code only → atlas</li>
+        <li>paper only → paper session</li>
+        <li>both → atlas + paper</li>
       </ul>
-      <p style="margin-top:0.9rem">Limits on this public demo: zip ≤ 25&nbsp;MB, walkthrough condensed for speed. For private / large repos, run the CLI locally from the GitHub project.</p>
+      <p style="margin-top:0.9rem">Limits on this public demo: zip ≤ 25&nbsp;MB, single file ≤ 5&nbsp;MB, paper ≤ 20&nbsp;MB.</p>
     </div>
 
     <footer class="footer">
@@ -78,14 +82,32 @@
   <script>
     const form = document.getElementById("map-form");
     const status = document.getElementById("status");
+    const formError = document.getElementById("form-error");
     const mapBtn = document.getElementById("btn-map");
     const demoBtn = document.getElementById("btn-demo");
+    const zipInput = document.getElementById("code_zip");
+    const fileInput = document.getElementById("code_file");
+    const paperInput = document.getElementById("paper_pdf");
+
     function busy(on) {
       status.classList.toggle("on", on);
       mapBtn.disabled = on;
       if (demoBtn) demoBtn.style.pointerEvents = on ? "none" : "";
     }
-    form.addEventListener("submit", () => busy(true));
+
+    form.addEventListener("submit", (ev) => {
+      formError.textContent = "";
+      const hasZip = zipInput.files && zipInput.files.length > 0;
+      const hasFile = fileInput.files && fileInput.files.length > 0;
+      const hasPaper = paperInput.files && paperInput.files.length > 0;
+      if (!hasZip && !hasFile && !hasPaper) {
+        ev.preventDefault();
+        formError.textContent = "Choose a code zip, a source file, a research paper, or any combination.";
+        formError.classList.add("on");
+        return;
+      }
+      busy(true);
+    });
     demoBtn.addEventListener("click", () => busy(true));
   </script>
 </body>

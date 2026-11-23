@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex Cartographer — Paper session</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=EB+Garamond:ital,wght@0,450;0,600;1,450&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/landing.css" />
+  <style>
+    .paper-layout {
+      display: grid;
+      grid-template-columns: minmax(240px, 320px) 1fr;
+      gap: 1rem;
+      min-height: 70vh;
+    }
+    @media (max-width: 800px) {
+      .paper-layout { grid-template-columns: 1fr; }
+    }
+    .paper-side {
+      background: rgba(247, 237, 214, 0.92);
+      border: 1.5px solid var(--gold);
+      padding: 1rem 1.1rem;
+    }
+    .paper-side h2 {
+      margin: 0 0 0.4rem;
+      font-family: var(--font-display);
+      color: var(--rust);
+      font-size: 1.4rem;
+    }
+    .paper-frame {
+      border: 1.5px solid var(--gold);
+      background: #fff;
+      min-height: 70vh;
+      width: 100%;
+    }
+    .paper-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="brand-row">
+      <div>
+        <h1>Paper session</h1>
+        <p class="tag" id="paper-label">Research paper</p>
+      </div>
+    </header>
+    <div class="paper-layout">
+      <aside class="paper-side">
+        <h2 id="title">Uploaded paper</h2>
+        <p class="hint" id="blurb">
+          This session has a research paper only. You can read it here.
+          Upload code (zip or a source file) on the home page to build the interactive atlas alongside a paper.
+        </p>
+        <div class="paper-actions">
+          <a class="btn" id="open-paper" href="#" target="_blank" rel="noopener">Open PDF</a>
+          <a class="btn secondary" href="/">Upload code or another paper</a>
+        </div>
+      </aside>
+      <iframe class="paper-frame" id="viewer" title="Research paper PDF"></iframe>
+    </div>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const job = params.get("job") || "";
+    const name = params.get("name") || "Research paper";
+    const file = params.get("file") || "paper.pdf";
+    document.getElementById("title").textContent = name;
+    document.getElementById("paper-label").textContent = file;
+    const url = "/jobs/" + encodeURIComponent(job) + "/paper";
+    document.getElementById("viewer").src = url;
+    document.getElementById("open-paper").href = url;
+  </script>
+</body>
+</html>
