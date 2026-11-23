@@ -1,0 +1,13 @@
+.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/*.egg-info
+.git
+output
+*.graph.json
+.DS_Store
+Screenshot*
+vrtulsrc*.py
+**/.mypy_cache
+**/.ruff_cache

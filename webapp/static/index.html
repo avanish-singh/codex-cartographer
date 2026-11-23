@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex Cartographer — Interactive Code Atlas</title>
+  <meta name="description" content="Upload a codebase and explore how it works as an interactive 2D/3D atlas with a line-by-line walkthrough." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Courier+Prime&family=EB+Garamond:ital,wght@0,450;0,600;1,450&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/landing.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="brand-row">
+      <svg class="compass" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="#f3e6c8" stroke="#8B6914" stroke-width="2"/>
+        <circle cx="32" cy="32" r="24" fill="none" stroke="#b08d3e" stroke-width="1" stroke-dasharray="2 2"/>
+        <polygon points="32,8 36,32 32,28 28,32" fill="#8B3A2A"/>
+        <polygon points="32,56 28,32 32,36 36,32" fill="#4a3220"/>
+        <circle cx="32" cy="32" r="3" fill="#b08d3e" stroke="#2b1d12"/>
+      </svg>
+      <div>
+        <h1>Codex Cartographer</h1>
+        <p class="tag">Interactive atlas of how a codebase works</p>
+      </div>
+    </header>
+
+    <p class="lede">
+      Upload a project zip (and optionally a research paper). The atlas opens in your browser:
+      a line-by-line walkthrough on the left, a live 2D/3D dependency map on the right.
+    </p>
+
+    <section class="panel" aria-label="Upload and map">
+      <h2>Start mapping</h2>
+      <p class="hint">Zip a folder of source files. Optional PDF is attached to the session for reference with the paper-summary view.</p>
+
+      <form id="map-form" action="/api/map" method="post" enctype="multipart/form-data">
+        <div class="grid">
+          <div class="field-block">
+            <label class="field" for="code_zip">Code archive (.zip) *</label>
+            <input id="code_zip" name="code_zip" type="file" accept=".zip,application/zip" required />
+          </div>
+          <div class="field-block">
+            <label class="field" for="paper_pdf">Research paper (.pdf)</label>
+            <input id="paper_pdf" name="paper_pdf" type="file" accept=".pdf,application/pdf" />
+          </div>
+        </div>
+        <div class="field-block">
+          <label class="field" for="project_name">Project name (optional)</label>
+          <input id="project_name" name="project_name" type="text" maxlength="120" placeholder="e.g. Barrier loss training pipeline" />
+        </div>
+        <div class="actions">
+          <button type="submit" id="btn-map">Map my code</button>
+          <a class="btn secondary" href="/api/demo" id="btn-demo">Try the live demo</a>
+        </div>
+        <p class="status" id="status">Building your atlas — this can take up to a minute for larger projects…</p>
+      </form>
+    </section>
+
+    <div class="meta">
+      <p><strong>Languages:</strong> Python, JS/TS, C/C++, MATLAB/Octave, Java, Go, Rust, R, Julia, and more.</p>
+      <ul class="langs">
+        <li>line-by-line walkthrough</li>
+        <li>2D / 3D map</li>
+        <li>dependency focus</li>
+        <li>research-paper summary</li>
+      </ul>
+      <p style="margin-top:0.9rem">Limits on this public demo: zip ≤ 25&nbsp;MB, walkthrough condensed for speed. For private / large repos, run the CLI locally from the GitHub project.</p>
+    </div>
+
+    <footer class="footer">
+      Open source on
+      <a href="https://github.com/avanish-singh/codex-cartographer" target="_blank" rel="noopener">GitHub</a>
+      · Built as a local-first code atlas; this page is the hosted demo for sharing.
+    </footer>
+  </div>
+  <script>
+    const form = document.getElementById("map-form");
+    const status = document.getElementById("status");
+    const mapBtn = document.getElementById("btn-map");
+    const demoBtn = document.getElementById("btn-demo");
+    function busy(on) {
+      status.classList.toggle("on", on);
+      mapBtn.disabled = on;
+      if (demoBtn) demoBtn.style.pointerEvents = on ? "none" : "";
+    }
+    form.addEventListener("submit", () => busy(true));
+    demoBtn.addEventListener("click", () => busy(true));
+  </script>
+</body>
+</html>
