@@ -225,12 +225,14 @@ def _call_llm(paper_text: str) -> dict[str, Any]:
             },
         ],
     }
+    # Groq's Cloudflare edge rejects Python-urllib's default User-Agent (403 / 1010).
     req = urllib.request.Request(
         f"{base}/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
+            "User-Agent": "codex-cartographer/1.0",
         },
         method="POST",
     )
