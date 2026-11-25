@@ -16,6 +16,8 @@ export OPENAI_MODEL=gpt-4o-mini
 export OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
+Any OpenAI-compatible endpoint works. For Groq's free tier, use `OPENAI_BASE_URL=https://api.groq.com/openai/v1` and `OPENAI_MODEL=openai/gpt-oss-120b`. Papers longer than the provider's token limit are condensed automatically.
+
 Without a key, the paper session still splits headings and shows a basic method flow.
 
 ---

@@ -206,25 +206,72 @@ def _llm_enabled() -> bool:
     return bool(os.environ.get("OPENAI_API_KEY", "").strip())
 
 
-def _call_llm(paper_text: str) -> dict[str, Any]:
-    api_key = os.environ["OPENAI_API_KEY"].strip()
-    base = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
-    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-    payload = {
-        "model": model,
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"},
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    "Analyze this research paper text and return the JSON object.\n\n"
-                    f"{paper_text}"
-                ),
-            },
-        ],
-    }
+MIN_LLM_CHARS = 6000
+MAX_LLM_ATTEMPTS = 4
+OUTPUT_TOKEN_RESERVE = 3000
+OMITTED_MARK = "\n\n[... part of the paper omitted to fit the model's token limit ...]\n\n"
+
+_TOKEN_LIMIT_RE = re.compile(r"Limit (\d+), Requested (\d+)")
+_REFERENCES_RE = re.compile(r"^\s*(references|bibliography)\s*$", re.IGNORECASE | re.MULTILINE)
+
+
+class _LLMHTTPError(Exception):
+    def __init__(self, code: int, detail: str) -> None:
+        super().__init__(f"LLM API error ({code}): {detail}")
+        self.code = code
+        self.detail = detail
+
+    @property
+    def too_large(self) -> bool:
+        """True when the provider rejected the request for its size, not its content."""
+        if self.code == 413 or "Request too large" in self.detail:
+            return True
+        return "context_length_exceeded" in self.detail
+
+
+def condense_text(text: str, budget: int) -> str:
+    """
+    Fit paper text into `budget` characters.
+
+    Drops the reference list first, then keeps the start (abstract, intro,
+    method), a slice of the middle, and the end (results, conclusions).
+    """
+    if len(text) <= budget:
+        return text
+    matches = list(_REFERENCES_RE.finditer(text))
+    if matches and matches[-1].start() > len(text) // 2:
+        text = text[: matches[-1].start()].rstrip()
+        if len(text) <= budget:
+            return text
+
+    room = max(budget - 2 * len(OMITTED_MARK), 0)
+    head = int(room * 0.55)
+    middle = int(room * 0.20)
+    tail = room - head - middle
+    mid_start = max(head, (len(text) - middle) // 2)
+    return (
+        text[:head]
+        + OMITTED_MARK
+        + text[mid_start : mid_start + middle]
+        + OMITTED_MARK
+        + text[len(text) - tail :]
+    )
+
+
+def _shrunk_budget(sent_chars: int, detail: str) -> int:
+    """Pick a smaller character budget after a too-large rejection."""
+    factor = 0.5
+    match = _TOKEN_LIMIT_RE.search(detail)
+    if match:
+        limit, requested = int(match.group(1)), int(match.group(2))
+        # Leave room for the reply: output tokens count against the same limit.
+        usable = limit - OUTPUT_TOKEN_RESERVE if limit > 2 * OUTPUT_TOKEN_RESERVE else limit // 2
+        if requested > 0:
+            factor = min(0.95 * usable / requested, 0.8)
+    return max(int(sent_chars * factor), MIN_LLM_CHARS)
+
+
+def _post_chat(base: str, api_key: str, payload: dict[str, Any]) -> dict[str, Any]:
     # Groq's Cloudflare edge rejects Python-urllib's default User-Agent (403 / 1010).
     req = urllib.request.Request(
         f"{base}/chat/completions",
@@ -238,18 +285,74 @@ def _call_llm(paper_text: str) -> dict[str, Any]:
     )
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
-            raw = json.loads(resp.read().decode("utf-8"))
+            return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:400]
-        raise ValueError(f"LLM API error ({exc.code}): {detail}") from exc
+        raise _LLMHTTPError(exc.code, detail) from exc
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"LLM request failed: {exc}") from exc
 
-    content = raw["choices"][0]["message"]["content"]
-    data = json.loads(content)
+
+def _parse_json_content(content: str) -> dict[str, Any]:
+    """Parse the model's reply, tolerating code fences or stray text around the JSON."""
+    text = (content or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end <= start:
+            raise ValueError("LLM reply was not valid JSON") from None
+        try:
+            data = json.loads(text[start : end + 1])
+        except json.JSONDecodeError as exc:
+            raise ValueError("LLM reply was not valid JSON") from exc
     if not isinstance(data, dict):
         raise ValueError("LLM returned non-object JSON")
     return data
+
+
+def _call_llm(paper_text: str) -> tuple[dict[str, Any], bool]:
+    """
+    Ask the model for the analysis JSON.
+
+    Returns (data, condensed). Free tiers cap tokens per request, so when the
+    provider says the request is too large we retry with a condensed paper.
+    """
+    api_key = os.environ["OPENAI_API_KEY"].strip()
+    base = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    budget = len(paper_text)
+    for attempt in range(MAX_LLM_ATTEMPTS):
+        text = condense_text(paper_text, budget)
+        payload = {
+            "model": model,
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        "Analyze this research paper text and return the JSON object.\n\n"
+                        f"{text}"
+                    ),
+                },
+            ],
+        }
+        try:
+            raw = _post_chat(base, api_key, payload)
+        except _LLMHTTPError as exc:
+            last_attempt = attempt == MAX_LLM_ATTEMPTS - 1
+            if exc.too_large and not last_attempt and len(text) > MIN_LLM_CHARS:
+                budget = _shrunk_budget(len(text), exc.detail)
+                continue
+            raise ValueError(str(exc)) from exc
+        content = raw["choices"][0]["message"]["content"]
+        return _parse_json_content(content), len(text) < len(paper_text)
+    raise ValueError("LLM request failed: paper is too large for the model's token limit")
 
 
 def _normalize(data: dict[str, Any], *, mode: str, source: str) -> dict[str, Any]:
@@ -308,8 +411,10 @@ def analyze_paper(pdf_path: Path, *, filename: str | None = None) -> dict[str, A
 
     if _llm_enabled():
         try:
-            data = _call_llm(text)
-            return _normalize(data, mode="llm", source=source)
+            data, condensed = _call_llm(text)
+            out = _normalize(data, mode="llm", source=source)
+            out["input_condensed"] = condensed
+            return out
         except Exception as exc:  # noqa: BLE001 — fall back rather than fail the upload
             sections = heuristic_sections(text)
             steps, mermaid = heuristic_methodology_mermaid(sections)

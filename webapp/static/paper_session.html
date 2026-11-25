@@ -232,12 +232,16 @@
       els.status.textContent = data.mode === "llm"
         ? "Guided by LLM section analysis" + (data.llm_model ? " (" + data.llm_model + ")" : "")
         : (data.mode === "heuristic"
-          ? "Heuristic preview — add OPENAI_API_KEY on the server for full LLM explanations"
+          ? (data.error
+            ? "Heuristic preview — the LLM request failed, see the note below"
+            : "Heuristic preview — add OPENAI_API_KEY on the server for full LLM explanations")
           : "Analysis status: " + (data.mode || "unknown"));
       els.modeNote.textContent = data.error
         ? ("Note: " + data.error)
         : (data.mode === "llm"
-          ? "Explanations and the methodology flowchart were generated from the paper text."
+          ? (data.input_condensed
+            ? "This paper is longer than the model's token limit, so the analysis used the start, a middle slice, and the end of the text."
+            : "Explanations and the methodology flowchart were generated from the paper text.")
           : "Without an API key the app still splits headings and shows a basic method flow.");
 
       els.list.innerHTML = (data.sections || []).map((s, i) =>
