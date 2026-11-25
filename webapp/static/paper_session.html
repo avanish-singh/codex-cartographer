@@ -3,74 +3,295 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Codex Cartographer — Paper session</title>
+  <title>Codex Cartographer — Paper guide</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=EB+Garamond:ital,wght@0,450;0,600;1,450&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/landing.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
-    .paper-layout {
+    .guide-layout {
       display: grid;
-      grid-template-columns: minmax(240px, 320px) 1fr;
-      gap: 1rem;
-      min-height: 70vh;
+      grid-template-columns: 220px minmax(0, 1fr) minmax(280px, 360px);
+      gap: 0.85rem;
+      min-height: 72vh;
+      align-items: stretch;
     }
-    @media (max-width: 800px) {
-      .paper-layout { grid-template-columns: 1fr; }
+    @media (max-width: 980px) {
+      .guide-layout { grid-template-columns: 1fr; }
     }
-    .paper-side {
-      background: rgba(247, 237, 214, 0.92);
+    .panel-box {
+      background: rgba(247, 237, 214, 0.94);
       border: 1.5px solid var(--gold);
-      padding: 1rem 1.1rem;
+      padding: 0.85rem 0.95rem;
+      overflow: auto;
+      max-height: 78vh;
     }
-    .paper-side h2 {
-      margin: 0 0 0.4rem;
+    .panel-box h2, .panel-box h3 {
+      margin: 0 0 0.45rem;
       font-family: var(--font-display);
       color: var(--rust);
-      font-size: 1.4rem;
     }
-    .paper-frame {
-      border: 1.5px solid var(--gold);
-      background: #fff;
-      min-height: 70vh;
+    .panel-box h3 { font-size: 1.15rem; color: var(--brown); margin-top: 0.9rem; }
+    .sec-btn {
+      display: block;
       width: 100%;
+      text-align: left;
+      margin: 0 0 0.35rem;
+      padding: 0.4rem 0.55rem;
+      border: 1px solid var(--gold-faded);
+      background: var(--parchment);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      cursor: pointer;
     }
-    .paper-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    .sec-btn.active, .sec-btn:hover {
+      border-color: var(--rust);
+      background: rgba(139, 58, 42, 0.1);
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid var(--gold-faded);
+      padding: 0.1rem 0.4rem;
+      color: var(--brown);
+      margin-left: 0.35rem;
+    }
+    .key-points { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+    .key-points li { margin: 0.2rem 0; }
+    .steps { margin: 0; padding: 0; list-style: none; }
+    .steps li {
+      border-left: 3px solid var(--rust);
+      padding: 0.35rem 0.55rem;
+      margin: 0.35rem 0;
+      background: rgba(176, 141, 62, 0.08);
+    }
+    .steps .step-label { font-weight: 600; color: var(--brown); }
+    #mermaid-wrap {
+      background: #fffdf6;
+      border: 1px solid var(--gold-faded);
+      padding: 0.6rem;
+      overflow: auto;
+    }
+    #mermaid-wrap .mermaid { display: flex; justify-content: center; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.6rem 0 1rem; }
+    .muted { color: var(--ink-soft); font-size: 0.92rem; }
+    .pdf-frame {
+      width: 100%;
+      min-height: 70vh;
+      border: 1px solid var(--gold);
+      background: #fff;
+      display: none;
+    }
+    .pdf-frame.on { display: block; }
+    #guide-main.on-pdf .explain-block { display: none; }
+    #status-line { font-style: italic; color: var(--ink-soft); margin: 0 0 0.6rem; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header class="brand-row">
       <div>
-        <h1>Paper session</h1>
-        <p class="tag" id="paper-label">Research paper</p>
+        <h1 id="doc-title">Paper guide</h1>
+        <p class="tag" id="doc-file">Research paper</p>
       </div>
     </header>
-    <div class="paper-layout">
-      <aside class="paper-side">
-        <h2 id="title">Uploaded paper</h2>
-        <p class="hint" id="blurb">
-          This session has a research paper only. You can read it here.
-          Upload code (zip or a source file) on the home page to build the interactive atlas alongside a paper.
+
+    <p id="status-line">Loading analysis…</p>
+    <p class="lede" id="doc-summary" style="margin-top:0"></p>
+
+    <div class="toolbar">
+      <button type="button" class="btn" id="btn-sections">Sections</button>
+      <button type="button" class="btn secondary" id="btn-pdf">Original PDF</button>
+      <button type="button" class="btn secondary" id="btn-refresh">Re-analyze</button>
+      <a class="btn secondary" href="/">← Home</a>
+      <a class="btn secondary" id="open-pdf" href="#" target="_blank" rel="noopener">Download PDF</a>
+    </div>
+
+    <div class="guide-layout" id="guide-main">
+      <nav class="panel-box" aria-label="Sections">
+        <h2>Sections</h2>
+        <div id="section-list"></div>
+      </nav>
+
+      <section class="panel-box explain-block" aria-label="Explanation">
+        <h2 id="sec-title">Section</h2>
+        <p id="sec-explain" class="hint"></p>
+        <ul class="key-points" id="sec-points"></ul>
+
+        <h3>Methodology workflow</h3>
+        <p class="muted">Flowchart of the method described in the paper.</p>
+        <div id="mermaid-wrap"><pre class="mermaid" id="mermaid-src"></pre></div>
+
+        <h3>Method steps</h3>
+        <ol class="steps" id="method-steps"></ol>
+      </section>
+
+      <iframe class="pdf-frame" id="pdf-viewer" title="Original PDF"></iframe>
+
+      <aside class="panel-box" aria-label="How to read this">
+        <h2>How to use</h2>
+        <p class="hint">
+          Click each section on the left to read a plain-English explanation.
+          The flowchart shows the methodology pipeline end-to-end.
+          Switch to <em>Original PDF</em> anytime to verify against the source.
         </p>
-        <div class="paper-actions">
-          <a class="btn" id="open-paper" href="#" target="_blank" rel="noopener">Open PDF</a>
-          <a class="btn secondary" href="/">Upload code or another paper</a>
-        </div>
+        <p class="muted" id="mode-note"></p>
       </aside>
-      <iframe class="paper-frame" id="viewer" title="Research paper PDF"></iframe>
     </div>
   </div>
+
   <script>
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "base",
+      themeVariables: {
+        primaryColor: "#f3e6c8",
+        primaryTextColor: "#2b1d12",
+        primaryBorderColor: "#8b3a2a",
+        lineColor: "#5c4033",
+        secondaryColor: "#e8d4a8",
+        tertiaryColor: "#f7edd6",
+        fontFamily: "EB Garamond, Palatino, serif",
+      },
+    });
+
     const params = new URLSearchParams(location.search);
     const job = params.get("job") || "";
-    const name = params.get("name") || "Research paper";
-    const file = params.get("file") || "paper.pdf";
-    document.getElementById("title").textContent = name;
-    document.getElementById("paper-label").textContent = file;
-    const url = "/jobs/" + encodeURIComponent(job) + "/paper";
-    document.getElementById("viewer").src = url;
-    document.getElementById("open-paper").href = url;
+    const fallbackName = params.get("name") || "Research paper";
+    const fallbackFile = params.get("file") || "paper.pdf";
+
+    const els = {
+      title: document.getElementById("doc-title"),
+      file: document.getElementById("doc-file"),
+      summary: document.getElementById("doc-summary"),
+      status: document.getElementById("status-line"),
+      list: document.getElementById("section-list"),
+      secTitle: document.getElementById("sec-title"),
+      secExplain: document.getElementById("sec-explain"),
+      secPoints: document.getElementById("sec-points"),
+      steps: document.getElementById("method-steps"),
+      mermaid: document.getElementById("mermaid-src"),
+      modeNote: document.getElementById("mode-note"),
+      pdf: document.getElementById("pdf-viewer"),
+      openPdf: document.getElementById("open-pdf"),
+      guide: document.getElementById("guide-main"),
+    };
+
+    const pdfUrl = "/jobs/" + encodeURIComponent(job) + "/paper";
+    els.pdf.src = pdfUrl;
+    els.openPdf.href = pdfUrl;
+
+    let analysis = null;
+    let activeIdx = 0;
+
+    function showSection(i) {
+      if (!analysis || !analysis.sections || !analysis.sections.length) return;
+      activeIdx = i;
+      const sec = analysis.sections[i];
+      els.secTitle.textContent = sec.title || ("Section " + (i + 1));
+      els.secExplain.textContent = sec.explanation || "";
+      els.secPoints.innerHTML = (sec.key_points || [])
+        .map((p) => "<li>" + escapeHtml(p) + "</li>")
+        .join("");
+      [...els.list.querySelectorAll(".sec-btn")].forEach((b, idx) => {
+        b.classList.toggle("active", idx === i);
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    async function renderMermaid(code) {
+      const wrap = document.getElementById("mermaid-wrap");
+      wrap.innerHTML = '<pre class="mermaid" id="mermaid-src"></pre>';
+      const node = document.getElementById("mermaid-src");
+      node.textContent = code || "flowchart TD\n  A[No methodology flowchart]";
+      try {
+        await mermaid.run({ nodes: [node] });
+      } catch (err) {
+        wrap.innerHTML = "<p class='muted'>Could not render flowchart. Raw Mermaid:</p><pre>" +
+          escapeHtml(code || "") + "</pre>";
+      }
+    }
+
+    function renderAnalysis(data) {
+      analysis = data;
+      els.title.textContent = data.title || fallbackName;
+      els.file.textContent = (data.source_file || fallbackFile) +
+        (data.mode ? " · " + data.mode : "");
+      els.summary.textContent = data.summary || "";
+      els.status.textContent = data.mode === "llm"
+        ? "Guided by LLM section analysis" + (data.llm_model ? " (" + data.llm_model + ")" : "")
+        : (data.mode === "heuristic"
+          ? "Heuristic preview — add OPENAI_API_KEY on the server for full LLM explanations"
+          : "Analysis status: " + (data.mode || "unknown"));
+      els.modeNote.textContent = data.error
+        ? ("Note: " + data.error)
+        : (data.mode === "llm"
+          ? "Explanations and the methodology flowchart were generated from the paper text."
+          : "Without an API key the app still splits headings and shows a basic method flow.");
+
+      els.list.innerHTML = (data.sections || []).map((s, i) =>
+        '<button type="button" class="sec-btn" data-i="' + i + '">' +
+        escapeHtml(s.title || ("Section " + (i + 1))) +
+        '<span class="badge">' + escapeHtml(s.id || "") + "</span></button>"
+      ).join("") || "<p class='muted'>No sections detected.</p>";
+
+      els.list.querySelectorAll(".sec-btn").forEach((btn) => {
+        btn.addEventListener("click", () => showSection(Number(btn.getAttribute("data-i"))));
+      });
+
+      els.steps.innerHTML = (data.methodology_steps || []).map((s) =>
+        "<li><div class='step-label'>" + escapeHtml(s.label) + "</div>" +
+        "<div class='muted'>" + escapeHtml(s.detail || "") + "</div></li>"
+      ).join("") || "<li class='muted'>No method steps extracted.</li>";
+
+      showSection(0);
+      renderMermaid(data.methodology_mermaid || "");
+    }
+
+    async function loadAnalysis() {
+      els.status.textContent = "Loading analysis…";
+      const res = await fetch("/jobs/" + encodeURIComponent(job) + "/paper-analysis");
+      if (!res.ok) {
+        els.status.textContent = "No analysis yet for this job.";
+        return;
+      }
+      renderAnalysis(await res.json());
+    }
+
+    document.getElementById("btn-pdf").addEventListener("click", () => {
+      els.guide.classList.add("on-pdf");
+      els.pdf.classList.add("on");
+    });
+    document.getElementById("btn-sections").addEventListener("click", () => {
+      els.guide.classList.remove("on-pdf");
+      els.pdf.classList.remove("on");
+    });
+    document.getElementById("btn-refresh").addEventListener("click", async () => {
+      els.status.textContent = "Re-analyzing paper…";
+      const res = await fetch("/jobs/" + encodeURIComponent(job) + "/paper-analysis/refresh", { method: "POST" });
+      if (!res.ok) {
+        els.status.textContent = "Refresh failed.";
+        return;
+      }
+      renderAnalysis(await res.json());
+    });
+
+    if (!job) {
+      els.status.textContent = "Missing job id.";
+    } else {
+      loadAnalysis();
+    }
   </script>
 </body>
 </html>

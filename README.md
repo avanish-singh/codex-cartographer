@@ -5,7 +5,18 @@ Interactive atlas of how a codebase works — line by line, in 2D and 3D.
 Point it at a file or folder. It parses the sources, builds a semantic dependency graph, and opens a self-contained HTML map in the browser. The left panel walks through the code with plain-English explanations; the right panel shows a live map of modules, functions, calls, and imports.
 
 **Live demo:** [https://codex-cartographer.onrender.com](https://codex-cartographer.onrender.com)  
-Upload a project zip (optional paper PDF) or try the built-in sample.
+Upload a project zip and/or a research paper PDF, or try the built-in sample.
+
+For LLM-guided paper breakdown (section explanations + methodology flowchart), set on the host:
+
+```bash
+export OPENAI_API_KEY=sk-...
+# optional:
+export OPENAI_MODEL=gpt-4o-mini
+export OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+Without a key, the paper session still splits headings and shows a basic method flow.
 
 ---
 

@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 
 from codex_cartographer.ingestion.walker import SUPPORTED_EXTENSIONS
 from codex_cartographer.pipeline import MappingError, map_project
+from webapp.paper_analysis import analyze_paper, save_analysis
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = Path(__file__).resolve().parent / "static"
@@ -106,7 +107,39 @@ def paper_session_page() -> HTMLResponse:
 
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True, "service": "codex-cartographer"}
+    return {
+        "ok": True,
+        "service": "codex-cartographer",
+        "llm_configured": bool(os.environ.get("OPENAI_API_KEY", "").strip()),
+        "llm_model": os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        if os.environ.get("OPENAI_API_KEY", "").strip()
+        else None,
+    }
+
+
+def _analyze_uploaded_paper(job: Path, paper_name: str) -> dict:
+    """Run section / methodology analysis; never raise to the client."""
+    try:
+        analysis = analyze_paper(job / "paper.pdf", filename=paper_name)
+        save_analysis(job, analysis)
+        return analysis
+    except Exception as exc:  # noqa: BLE001
+        fallback = {
+            "version": 1,
+            "mode": "error",
+            "source_file": paper_name,
+            "title": Path(paper_name).stem,
+            "summary": f"Paper analysis failed: {exc}",
+            "sections": [],
+            "methodology_steps": [],
+            "methodology_mermaid": (
+                "flowchart TD\n  A[Upload paper] --> B[Analysis unavailable]\n"
+                "  B --> C[Open original PDF]"
+            ),
+            "error": str(exc),
+        }
+        save_analysis(job, fallback)
+        return fallback
 
 
 def _run_demo_job() -> str:
@@ -175,12 +208,13 @@ async def map_upload(
         paper_note = (
             f"Uploaded paper `{paper_name}`"
             + (f" for “{paper_title}”." if paper_title else ".")
-            + f" Available at /jobs/{job_id}/paper."
+            + f" Guided paper session: /paper-session?job={job_id}"
         )
+        _analyze_uploaded_paper(job, paper_name)
 
     has_code = has_zip or has_file
     if not has_code:
-        # Paper-only session
+        # Paper-only guided session (sections + methodology flowchart)
         _write_summary(
             job,
             {
@@ -189,6 +223,7 @@ async def map_upload(
                 "mode": "paper_only",
                 "has_paper": True,
                 "paper_name": paper_name,
+                "has_analysis": (job / "paper_analysis.json").exists(),
             },
         )
         return RedirectResponse(
@@ -296,6 +331,14 @@ async def map_upload(
             "roles": summary["roles"],
             "has_paper": has_paper,
             "paper_name": paper_name,
+            "has_analysis": (job / "paper_analysis.json").exists(),
+            "paper_session": _paper_session_url(
+                job_id,
+                title=label or Path(paper_name or "paper").stem,
+                filename=paper_name or "paper.pdf",
+            )
+            if has_paper
+            else None,
         },
     )
     return RedirectResponse(url=f"/jobs/{job_id}/atlas", status_code=303)
@@ -323,6 +366,32 @@ def get_summary(job_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="Summary not found.")
     return FileResponse(path, media_type="application/json")
+
+
+@app.get("/jobs/{job_id}/paper-analysis")
+def get_paper_analysis(job_id: str):
+    path = _job_dir(job_id) / "paper_analysis.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="No paper analysis for this job.")
+    return FileResponse(path, media_type="application/json")
+
+
+@app.post("/jobs/{job_id}/paper-analysis/refresh")
+def refresh_paper_analysis(job_id: str):
+    """Re-run analysis (useful after setting OPENAI_API_KEY)."""
+    job = _job_dir(job_id)
+    pdf = job / "paper.pdf"
+    if not pdf.exists():
+        raise HTTPException(status_code=404, detail="No paper uploaded for this job.")
+    summary_path = job / "summary.json"
+    paper_name = "paper.pdf"
+    if summary_path.exists():
+        try:
+            paper_name = json.loads(summary_path.read_text(encoding="utf-8")).get("paper_name") or paper_name
+        except Exception:  # noqa: BLE001
+            pass
+    analysis = _analyze_uploaded_paper(job, paper_name)
+    return JSONResponse(analysis)
 
 
 @app.exception_handler(HTTPException)
